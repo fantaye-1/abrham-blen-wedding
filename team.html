@@ -134,8 +134,9 @@ header{background:linear-gradient(135deg,#1a1a1a 0%,#2d2416 100%);padding:1.2rem
 .task-progress-fill{height:100%;background:var(--gold);border-radius:4px;transition:width 0.4s}
 
 /* View toggle */
-.view-toggle{display:flex;gap:0.4rem;margin-bottom:1.2rem;background:#f0ebe0;border-radius:8px;padding:0.3rem}
-.view-toggle-btn{flex:1;font-family:sans-serif;font-size:0.7rem;letter-spacing:0.06em;text-transform:uppercase;padding:0.45rem 0.5rem;border-radius:6px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:all 0.2s;text-align:center}
+.view-toggle{display:flex;gap:0.4rem;margin-bottom:1.2rem;background:#f0ebe0;border-radius:8px;padding:0.3rem;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.view-toggle::-webkit-scrollbar{display:none}
+.view-toggle-btn{flex:1;min-width:max-content;white-space:nowrap;font-family:sans-serif;font-size:0.7rem;letter-spacing:0.06em;text-transform:uppercase;padding:0.45rem 0.6rem;border-radius:6px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:all 0.2s;text-align:center}
 .view-toggle-btn.active{background:#fff;color:var(--dark);box-shadow:0 1px 4px rgba(0,0,0,0.1);font-weight:600}
 
 /* Task list view */
@@ -584,6 +585,12 @@ header{background:linear-gradient(135deg,#1a1a1a 0%,#2d2416 100%);padding:1.2rem
 </head>
 <body>
 
+<!-- LOADING OVERLAY — shown until data loads -->
+<div id="app-loading" style="position:fixed;inset:0;z-index:9000;background:linear-gradient(160deg,#1a1a1a,#2d2416);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1rem;pointer-events:all">
+  <div style="font-family:'Georgia',serif;font-size:1.8rem;color:#c9a96e;letter-spacing:0.1em">A &amp; B</div>
+  <div style="font-family:sans-serif;font-size:0.65rem;color:rgba(255,255,255,0.35);letter-spacing:0.3em;text-transform:uppercase">Loading…</div>
+</div>
+
 <!-- GPS GATE OVERLAY -->
 <div id="gps-gate">
   <div class="gps-gate-box">
@@ -641,6 +648,19 @@ header{background:linear-gradient(135deg,#1a1a1a 0%,#2d2416 100%);padding:1.2rem
     </div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:0.75rem">
 
+      <!-- Receipt Scanner -->
+      <div style="display:flex;align-items:center;gap:0.6rem;background:#fdfaf6;border:1.5px dashed var(--gold-light);border-radius:8px;padding:0.65rem 0.85rem">
+        <span style="font-size:1.2rem">📷</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:sans-serif;font-size:0.72rem;font-weight:600;color:var(--dark);margin-bottom:0.1rem">Scan Receipt / Invoice</div>
+          <div style="font-family:sans-serif;font-size:0.65rem;color:var(--muted)" id="scan-status">Take a photo of a receipt to auto-fill amounts and item name.</div>
+        </div>
+        <label style="background:var(--gold);color:#fff;border-radius:6px;padding:0.38rem 0.75rem;font-family:sans-serif;font-size:0.72rem;cursor:pointer;white-space:nowrap;flex-shrink:0">
+          📷 Scan
+          <input type="file" accept="image/*" capture="environment" id="receipt-input" style="display:none" onchange="scanReceipt(this)"/>
+        </label>
+      </div>
+
       <div class="form-row">
         <label>Item Name <span style="color:var(--red)">*</span></label>
         <input id="bm-item" type="text" placeholder="e.g. Venue(Beza Event Center)"/>
@@ -677,58 +697,65 @@ header{background:linear-gradient(135deg,#1a1a1a 0%,#2d2416 100%);padding:1.2rem
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
-        <div class="form-row" style="margin:0">
-          <label>Deposit Paid ($)</label>
-          <input id="bm-deposit" type="number" step="0.01" min="0" placeholder="0.00"/>
-        </div>
-        <div class="form-row" style="margin:0">
-          <label>Deposit Date</label>
-          <input id="bm-deposit-date" type="text" placeholder="e.g. December 24, 2025"/>
-        </div>
-      </div>
+      <!-- Advanced fields toggle -->
+      <button id="bm-advanced-toggle" type="button" onclick="toggleBmAdvanced()" style="display:flex;align-items:center;gap:0.35rem;background:none;border:none;font-family:sans-serif;font-size:0.75rem;color:var(--gold-dark);cursor:pointer;padding:0.2rem 0;text-align:left">
+        <span id="bm-advanced-arrow">▶</span> More payment details
+      </button>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
-        <div class="form-row" style="margin:0">
-          <label>Total Paid (yekefelnew) ($)</label>
-          <input id="bm-paid" type="number" step="0.01" min="0" placeholder="0.00"/>
+      <div id="bm-advanced" style="display:none;flex-direction:column;gap:0.75rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+          <div class="form-row" style="margin:0">
+            <label>Deposit Paid ($)</label>
+            <input id="bm-deposit" type="number" step="0.01" min="0" placeholder="0.00"/>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label>Deposit Date</label>
+            <input id="bm-deposit-date" type="text" placeholder="e.g. December 24, 2025"/>
+          </div>
         </div>
-        <div class="form-row" style="margin:0">
-          <label>Remaining Balance ($)</label>
-          <input id="bm-remaining" type="number" step="0.01" min="0" placeholder="0.00"/>
-        </div>
-      </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
-        <div class="form-row" style="margin:0">
-          <label>Payment Reminder Date</label>
-          <input id="bm-reminder" type="text" placeholder="e.g. July 26, 2026"/>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+          <div class="form-row" style="margin:0">
+            <label>Total Paid ($)</label>
+            <input id="bm-paid" type="number" step="0.01" min="0" placeholder="0.00"/>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label>Remaining Balance ($)</label>
+            <input id="bm-remaining" type="number" step="0.01" min="0" placeholder="0.00"/>
+          </div>
         </div>
-        <div class="form-row" style="margin:0">
-          <label>Final Payment Date</label>
-          <input id="bm-final" type="text" placeholder="e.g. July 31, 2026"/>
-        </div>
-      </div>
 
-      <div class="form-row">
-        <label>Vendor / Contact</label>
-        <input id="bm-vendor" type="text" placeholder="Name or phone number"/>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
-        <div class="form-row" style="margin:0">
-          <label>Gifted By</label>
-          <input id="bm-gifted-by" type="text" placeholder="Person's name"/>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+          <div class="form-row" style="margin:0">
+            <label>Payment Reminder Date</label>
+            <input id="bm-reminder" type="text" placeholder="e.g. July 26, 2026"/>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label>Final Payment Date</label>
+            <input id="bm-final" type="text" placeholder="e.g. July 31, 2026"/>
+          </div>
         </div>
-        <div class="form-row" style="margin:0">
-          <label>Gift Amount ($)</label>
-          <input id="bm-gifted-amt" type="number" step="0.01" min="0" placeholder="0.00"/>
-        </div>
-      </div>
 
-      <div class="form-row">
-        <label>Note</label>
-        <input id="bm-note" type="text" placeholder="Any additional notes"/>
+        <div class="form-row">
+          <label>Vendor / Contact</label>
+          <input id="bm-vendor" type="text" placeholder="Name or phone number"/>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+          <div class="form-row" style="margin:0">
+            <label>Gifted By</label>
+            <input id="bm-gifted-by" type="text" placeholder="Person's name"/>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label>Gift Amount ($)</label>
+            <input id="bm-gifted-amt" type="number" step="0.01" min="0" placeholder="0.00"/>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label>Note</label>
+          <input id="bm-note" type="text" placeholder="Any additional notes"/>
+        </div>
       </div>
 
       <div style="display:flex;gap:0.75rem;justify-content:space-between;margin-top:0.25rem;padding-top:0.75rem;border-top:1px solid var(--border);flex-wrap:wrap">
@@ -1088,7 +1115,7 @@ header{background:linear-gradient(135deg,#1a1a1a 0%,#2d2416 100%);padding:1.2rem
       <!-- View toggle -->
       <div class="view-toggle">
         <button class="view-toggle-btn active" id="vt-list" onclick="switchTaskView('list')">📋 List</button>
-        <button class="view-toggle-btn" id="vt-messages" onclick="switchTaskView('messages')" style="position:relative">📬 Messages<span id="msg-unread-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#e05c5c;color:#fff;border-radius:50%;width:16px;height:16px;font-size:0.6rem;font-family:sans-serif;display:flex;align-items:center;justify-content:center;font-weight:700"></span></button>
+        <button class="view-toggle-btn" id="vt-messages" onclick="switchTaskView('messages')" style="position:relative">📬 Messages<span id="msg-unread-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#e05c5c;color:#fff;border-radius:50%;width:16px;height:16px;font-size:0.6rem;font-family:sans-serif;align-items:center;justify-content:center;font-weight:700"></span></button>
         <button class="view-toggle-btn" id="vt-budget" onclick="switchTaskView('budget')" style="display:none">💰 Budget</button>
         <button class="view-toggle-btn" id="vt-wedding" onclick="switchTaskView('wedding')">🎊 Aug 2</button>
         <button class="view-toggle-btn" id="vt-checklist" onclick="switchTaskView('checklist')">✅ Checklist</button>
@@ -1287,8 +1314,8 @@ header{background:linear-gradient(135deg,#1a1a1a 0%,#2d2416 100%);padding:1.2rem
       <div class="admin-subtitle">August 2, 2026 · See all tasks and team locations</div>
 
       <div class="admin-tabs">
-        <button class="admin-tab" onclick="switchAdminTab('broadcast',this)">📢 Broadcast</button>
         <button class="admin-tab active" onclick="switchAdminTab('overview',this)">Overview</button>
+        <button class="admin-tab" onclick="switchAdminTab('broadcast',this)">📢 Broadcast</button>
         <button class="admin-tab" onclick="switchAdminTab('budget',this)">💰 Budget</button>
         <button class="admin-tab" onclick="switchAdminTab('team-mgmt',this)">👥 Manage Team</button>
         <button class="admin-tab" onclick="switchAdminTab('map',this)">📍 Locations</button>
@@ -1306,7 +1333,10 @@ header{background:linear-gradient(135deg,#1a1a1a 0%,#2d2416 100%);padding:1.2rem
       <div id="tab-budget" style="display:none">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem">
           <div style="font-family:sans-serif;font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--gold)">💰 Budget</div>
-          <button id="budget-toggle-btn" onclick="toggleBudgetPublic()" style="border:none;border-radius:20px;padding:0.28rem 0.7rem;font-family:sans-serif;font-size:0.7rem;cursor:pointer"></button>
+          <div style="display:flex;align-items:center;gap:0.5rem">
+            <button onclick="refreshBudgetNow()" title="Pull latest from cloud" id="budget-refresh-btn" style="background:none;border:1px solid var(--border);border-radius:6px;padding:0.18rem 0.45rem;font-size:0.75rem;cursor:pointer;color:var(--muted)">🔄</button>
+            <button id="budget-toggle-btn" onclick="toggleBudgetPublic()" style="border:none;border-radius:20px;padding:0.28rem 0.7rem;font-family:sans-serif;font-size:0.7rem;cursor:pointer"></button>
+          </div>
         </div>
         <div id="budget-content"></div>
       </div>
@@ -1324,8 +1354,9 @@ header{background:linear-gradient(135deg,#1a1a1a 0%,#2d2416 100%);padding:1.2rem
         <div class="map-section">
           <div class="map-header">
             <h3>📍 Live Locations</h3>
-            <div style="display:flex;align-items:center;gap:0.5rem">
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
               <span style="font-family:sans-serif;font-size:0.68rem;color:var(--muted)" id="map-last-updated">Waiting for locations…</span>
+              <button onclick="fitAllLocations()" title="Fit all on map" style="background:none;border:1px solid var(--border);border-radius:6px;padding:0.18rem 0.45rem;font-size:0.72rem;cursor:pointer;color:var(--muted)">⊡ All</button>
               <button onclick="refreshMapNow()" title="Refresh now" style="background:none;border:1px solid var(--border);border-radius:6px;padding:0.18rem 0.45rem;font-size:0.75rem;cursor:pointer;color:var(--muted)" id="map-refresh-btn">🔄</button>
             </div>
           </div>
@@ -1429,6 +1460,14 @@ header{background:linear-gradient(135deg,#1a1a1a 0%,#2d2416 100%);padding:1.2rem
 
       <!-- SETTINGS TAB (admin only) -->
       <div id="tab-settings" style="display:none">
+
+        <!-- Couple Admin Access -->
+        <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.5rem">
+          <div style="font-family:sans-serif;font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--gold);margin-bottom:0.25rem">👑 Couple Admin Access</div>
+          <p style="font-family:sans-serif;font-size:0.78rem;color:var(--muted);margin-bottom:1rem;line-height:1.6">When <b>Admin</b> is on, logging in as bride or groom opens the full admin dashboard. When <b>Task View</b> is on, they see only their personal tasks — same as any other team member.</p>
+          <div id="couple-admin-toggles" style="display:flex;gap:0.75rem;flex-wrap:wrap"></div>
+        </div>
+
         <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.5rem">
           <div style="font-family:sans-serif;font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--gold);margin-bottom:0.25rem">📍 GPS Enforcement</div>
           <p style="font-family:sans-serif;font-size:0.78rem;color:var(--muted);margin-bottom:1.25rem;line-height:1.6">On enforced dates, team members <strong>cannot access their tasks</strong> until GPS is turned on. Add the wedding date and any rehearsal/prep days you want covered.</p>
@@ -1514,7 +1553,8 @@ header{background:linear-gradient(135deg,#1a1a1a 0%,#2d2416 100%);padding:1.2rem
         <div class="pin-name" id="pin-name-label"></div>
         <div class="pin-role" id="pin-role-label"></div>
         <input class="pin-input" id="pin-input" type="password" inputmode="numeric" maxlength="4" placeholder="••••"
-          onkeydown="if(event.key==='Enter') submitPin()"/>
+          onkeydown="if(event.key==='Enter') submitPin()"
+          oninput="if(this.value.length===4) setTimeout(submitPin,150)"/>
         <p class="pin-error" id="pin-error">❌ Incorrect PIN. Please try again.</p>
         <button class="btn btn-gold btn-block" onclick="submitPin()">Access My Tasks</button>
       </div>
@@ -1535,7 +1575,8 @@ header{background:linear-gradient(135deg,#1a1a1a 0%,#2d2416 100%);padding:1.2rem
         <div class="pin-name">Admin Dashboard</div>
         <div class="pin-role" style="margin-bottom:1.2rem">Abrham &amp; Blen only</div>
         <input class="pin-input" id="admin-pin-input" type="password" inputmode="numeric" maxlength="4" placeholder="••••"
-          onkeydown="if(event.key==='Enter') submitAdminPin()"/>
+          onkeydown="if(event.key==='Enter') submitAdminPin()"
+          oninput="if(this.value.length===4) setTimeout(submitAdminPin,150)"/>
         <p class="pin-error" id="admin-pin-error">❌ Incorrect password.</p>
         <button class="btn btn-gold btn-block" onclick="submitAdminPin()">Enter</button>
       </div>
@@ -1720,6 +1761,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (b && !localStorage.getItem('gps_shared_' + currentUser)) b.style.display = 'flex';
     }
   }, 1000);
+  // Browser back button → go back to team hierarchy
+  window.addEventListener('popstate', () => {
+    stopTaskAutoRefresh();
+    stopMapAutoRefresh();
+    document.getElementById('hierarchy-page').style.display = 'block';
+    document.getElementById('task-page').style.display      = 'none';
+    document.getElementById('admin-page').style.display     = 'none';
+  });
 });
 
 /* DATA — JSONBin */
@@ -1808,6 +1857,9 @@ async function loadData() {
   updateHierarchyPhotos();
   if (currentUser) rescheduleAllReminders();
   restoreSession(); // auto-login if a session was saved
+  // Hide loading overlay once data (and session) are ready
+  const lo = document.getElementById('app-loading');
+  if (lo) lo.style.display = 'none';
 }
 
 async function saveData() {
@@ -1835,6 +1887,157 @@ function saveLocal() {
     if (roadTimelineData) localStorage.setItem('roadTimelineData', JSON.stringify(roadTimelineData));
     else localStorage.removeItem('roadTimelineData');
   } catch(e) {}
+}
+
+/* ── RECEIPT SCANNER ── */
+function scanReceipt(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById('scan-status');
+  status.textContent = '⏳ Reading receipt…';
+
+  const run = (Tesseract) => {
+    const url = URL.createObjectURL(file);
+    Tesseract.recognize(url, 'eng', { logger: () => {} }).then(({ data: { text } }) => {
+      URL.revokeObjectURL(url);
+      _parseReceiptText(text, status);
+    }).catch(() => {
+      status.textContent = '❌ Could not read receipt. Fill in manually.';
+    });
+  };
+
+  if (window.Tesseract) {
+    run(window.Tesseract);
+  } else {
+    status.textContent = '⬇️ Loading OCR engine…';
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js';
+    s.onload = () => run(window.Tesseract);
+    s.onerror = () => { status.textContent = '❌ OCR engine failed to load.'; };
+    document.head.appendChild(s);
+  }
+}
+
+function _parseReceiptText(text, statusEl) {
+  // Extract dollar amounts — match $X.XX or plain X.XX near "total"/"amount"/"cost"
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const allAmounts = [];
+  const amtRe = /\$?\s*(\d{1,6}(?:[.,]\d{2})?)/g;
+
+  lines.forEach(line => {
+    let m;
+    while ((m = amtRe.exec(line)) !== null) {
+      const val = parseFloat(m[1].replace(',', '.'));
+      if (val > 0) allAmounts.push({ val, line: line.replace(/\s+/g, ' ') });
+    }
+  });
+
+  // Find "total" line first, fall back to largest amount
+  let bestAmt = 0;
+  let bestLine = '';
+  const totalLine = lines.find(l => /\b(total|amount due|balance|grand total|subtotal)\b/i.test(l));
+  if (totalLine) {
+    const m = totalLine.match(/\$?\s*(\d{1,6}(?:[.,]\d{2})?)/);
+    if (m) { bestAmt = parseFloat(m[1].replace(',', '.')); bestLine = totalLine; }
+  }
+  if (!bestAmt && allAmounts.length) {
+    const sorted = [...allAmounts].sort((a, b) => b.val - a.val);
+    bestAmt = sorted[0].val;
+    bestLine = sorted[0].line;
+  }
+
+  // Try to extract a vendor / item name from top of receipt
+  const nameCandidates = lines.slice(0, 6).filter(l =>
+    l.length > 3 && l.length < 60 && !/\d{3,}/.test(l) && !/^(receipt|invoice|date|#|no\.)/i.test(l)
+  );
+  const guessedName = nameCandidates[0] || '';
+
+  if (bestAmt) {
+    const el = document.getElementById('bm-actual');
+    if (el && !el.value) el.value = bestAmt.toFixed(2);
+    const elEst = document.getElementById('bm-estimated');
+    if (elEst && !elEst.value) elEst.value = bestAmt.toFixed(2);
+  }
+  if (guessedName) {
+    const el = document.getElementById('bm-item');
+    if (el && !el.value) el.value = guessedName;
+  }
+
+  if (bestAmt) {
+    statusEl.innerHTML = `✅ Found: <b>$${bestAmt.toFixed(2)}</b>${guessedName ? ` · "${guessedName}"` : ''} — review and confirm below.`;
+    statusEl.style.color = 'var(--green)';
+  } else {
+    statusEl.textContent = '⚠️ No amounts found — fill in manually.';
+    statusEl.style.color = '#b8860b';
+  }
+  // Reset file input so same image can be re-scanned
+  document.getElementById('receipt-input').value = '';
+}
+
+/* ── EFFECTIVE ADMIN CHECK ── */
+function getEffectiveIsAdmin(id) {
+  const profileFlag = (appData[id] || {}).profile?.isAdmin;
+  if (profileFlag === false) return false;
+  if (profileFlag === true)  return true;
+  return TEAM[id]?.isAdmin || false;
+}
+
+/* ── COUPLE ADMIN TOGGLE ── */
+function renderCoupleAdminSettings() {
+  const container = document.getElementById('couple-admin-toggles');
+  if (!container) return;
+  container.innerHTML = ['abrham', 'blen'].map(id => {
+    const p   = TEAM[id];
+    const on  = getEffectiveIsAdmin(id);
+    return `
+      <div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem;display:flex;align-items:center;gap:0.75rem;flex:1;min-width:140px">
+        <span style="font-size:1.4rem">${p.emoji}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Georgia',serif;font-size:0.9rem;color:var(--dark)">${p.name}</div>
+          <div style="font-family:sans-serif;font-size:0.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em">${p.role}</div>
+        </div>
+        <button onclick="toggleCoupleAdmin('${id}')"
+          style="font-family:sans-serif;font-size:0.7rem;padding:0.3rem 0.8rem;border-radius:20px;border:none;cursor:pointer;white-space:nowrap;${on ? 'background:var(--gold);color:#fff' : 'background:#eee;color:#888'}">
+          ${on ? 'Admin ✓' : 'Task View'}
+        </button>
+      </div>`;
+  }).join('');
+}
+
+function toggleCoupleAdmin(id) {
+  if (!appData[id]) appData[id] = {};
+  if (!appData[id].profile) appData[id].profile = {};
+  const nowOn = !getEffectiveIsAdmin(id);
+  appData[id].profile.isAdmin = nowOn;
+  saveData();
+  renderCoupleAdminSettings();
+  showToast('success', `${TEAM[id].name} → ${nowOn ? 'Admin' : 'Task View'}`,
+    nowOn ? 'Will open admin dashboard on next login' : 'Will see personal tasks on next login', 4000);
+}
+
+/* ── BUDGET REFRESH ── */
+async function refreshBudgetNow() {
+  const btn = document.getElementById('budget-refresh-btn');
+  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+  if (JSONBIN_BIN_ID) {
+    try {
+      const r = await fetch(JSONBIN_URL + '/latest', {
+        headers: { 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Meta': 'false' }
+      });
+      if (r.ok) {
+        const d = await r.json();
+        if (d && d.budgetData && d.budgetData.length > 0) {
+          liveBudget = d.budgetData;
+          try { localStorage.setItem('budgetData', JSON.stringify(liveBudget)); } catch(e) {}
+        }
+        trackJsonBinRequest('read');
+      }
+    } catch(e) { showToast('error', 'Refresh failed', 'Check your connection', 3000); }
+  }
+  renderBudget();
+  _updateBudgetToggleUI();
+  if (btn) { btn.textContent = '🔄'; btn.disabled = false; }
+  showToast('success', 'Budget refreshed', 'Showing latest data', 2000);
 }
 
 async function saveBudget() {
@@ -2032,9 +2235,11 @@ function startCountdown() {
 
 /* HIERARCHY — tap person */
 /* ── SESSION PERSISTENCE ── */
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+
 function saveSession() {
   if (currentUser) {
-    try { localStorage.setItem('activeSession', JSON.stringify({ userId: currentUser, isAdmin, isCoordinator })); } catch(e) {}
+    try { localStorage.setItem('activeSession', JSON.stringify({ userId: currentUser, isAdmin, isCoordinator, loginTime: Date.now() })); } catch(e) {}
   }
 }
 function clearSession() {
@@ -2044,8 +2249,13 @@ function restoreSession() {
   try {
     const s = localStorage.getItem('activeSession');
     if (!s) return;
-    const { userId, isAdmin: a, isCoordinator: c } = JSON.parse(s);
+    const { userId, isAdmin: a, isCoordinator: c, loginTime } = JSON.parse(s);
     if (!TEAM[userId]) return;
+    // Expire session after 12 hours
+    if (loginTime && Date.now() - loginTime > SESSION_TTL_MS) {
+      clearSession();
+      return;
+    }
     currentUser = userId;
     isAdmin = a;
     isCoordinator = c;
@@ -2127,7 +2337,7 @@ function submitPin() {
 
   if (val === correctPin) {
     closePinModal(); // close AFTER saving personId
-    if (person.isAdmin) {
+    if (getEffectiveIsAdmin(personId)) {
       requestGPS(personId); // track bride/groom location silently
       openAdmin();
     } else if (personId === 'coordinator') {
@@ -2204,6 +2414,7 @@ function openCoordinatorAdmin() {
   renderOverviewGrid();
   requestGPS();
   checkGpsGate('coordinator');
+  history.pushState({ abwv: 'coordinator' }, '');
   showToast('success', 'Welcome, Coordinator!', 'Viewing team dashboard', 3000);
 }
 
@@ -2235,6 +2446,7 @@ function openAdmin() {
   if (grid) grid.style.display = 'block';
 
   renderOverviewGrid();
+  history.pushState({ abwv: 'admin' }, '');
   showToast('success', 'Admin Access', 'Welcome, Abrham & Blen 👑', 3000);
 }
 
@@ -2271,7 +2483,7 @@ function openTaskView(id) {
   // Show/hide All tab
   const allBtn = document.getElementById('vt-all');
   const isCoord = id === 'coordinator';
-  if (isCoord || person.isAdmin) {
+  if (isCoord || getEffectiveIsAdmin(id)) {
     allBtn.style.display = 'block';
     allBtn.textContent   = isCoord ? '👥 All Team' : '👥 All';
   } else {
@@ -2299,6 +2511,7 @@ function openTaskView(id) {
 
   showBroadcastBanner();
   requestNotificationPermission();
+  history.pushState({ abwv: 'task' }, '');
   showToast('success', `Welcome, ${displayName}!`,
     isCoord ? 'Viewing all team tasks' : `${data.tasks.length} tasks assigned`, 3000);
   startTaskAutoRefresh();
@@ -3459,9 +3672,26 @@ function requestGPS(forUserId) {
 
   const saveLocation = (pos) => {
     if ((gpsSettings.excludedIds || []).includes(userId)) return;
-    const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude, time: new Date().toLocaleTimeString() };
+    const now = Date.now();
+    const loc = {
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: now
+    };
     if (!appData[userId]) appData[userId] = { tasks: [], location: null };
     appData[userId].location = loc;
+
+    // Append to trail (keep last 30 significant moves)
+    if (!appData[userId].locationTrail) appData[userId].locationTrail = [];
+    const trail = appData[userId].locationTrail;
+    const last  = trail[trail.length - 1];
+    const moved = !last || Math.abs(last.lat - loc.lat) > 0.00005 || Math.abs(last.lng - loc.lng) > 0.00005;
+    if (moved) {
+      trail.push({ lat: loc.lat, lng: loc.lng, t: now });
+      if (trail.length > 30) trail.splice(0, trail.length - 30);
+    }
+
     localStorage.setItem('gps_shared_' + userId, '1');
     document.getElementById('gps-banner').style.display = 'none';
     hideGpsGate();
@@ -3469,7 +3699,6 @@ function requestGPS(forUserId) {
     if (gpsBtn) { gpsBtn.textContent = '🟢'; gpsBtn.title = 'Location tracking active'; }
     // Always save locally; push to cloud at most every 60 seconds to avoid rate limits
     saveLocal();
-    const now = Date.now();
     if (now - gpsLastCloudSave > 60000) {
       gpsLastCloudSave = now;
       saveData();
@@ -4071,7 +4300,7 @@ async function refreshTaskNow() {
   }
   showBroadcastBanner();
   _rerenderCurrentView();
-  const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   if (el)  el.textContent = `Updated ${now}`;
   if (btn) btn.disabled = false;
 }
@@ -4807,7 +5036,7 @@ function switchAdminTab(tab, btn) {
   if (tab === 'remind')     renderRemindersTab();
   if (tab === 'broadcast')  renderBroadcastAdmin();
   if (tab === 'checklist')  renderAdminChecklist();
-  if (tab === 'settings')   renderGpsSettings();
+  if (tab === 'settings')   { renderGpsSettings(); renderCoupleAdminSettings(); }
 }
 
 async function reverseGeocode(lat, lng, elId) {
@@ -4845,6 +5074,31 @@ async function reverseGeocode(lat, lng, elId) {
   }
 }
 
+function _locFreshness(loc) {
+  if (!loc || !loc.timestamp) return { icon: '⚪', label: 'unknown', fresh: false };
+  const age = Date.now() - loc.timestamp;
+  if (age < 10 * 60000)  return { icon: '🟢', label: age < 60000 ? 'just now' : `${Math.floor(age/60000)}m ago`, fresh: true };
+  if (age < 60 * 60000)  return { icon: '🟡', label: `${Math.floor(age/60000)}m ago`, fresh: true };
+  if (age < 4 * 3600000) return { icon: '🔴', label: `${Math.floor(age/3600000)}h ago`, fresh: false };
+  return { icon: '⚫', label: 'very old', fresh: false };
+}
+
+function panToLocation(id) {
+  const loc = (appData[id] || {}).location;
+  if (!window._leafletMap || !loc) return;
+  window._leafletMap.setView([loc.lat, loc.lng], 17);
+  const mk = window._leafletMarkers?.[id];
+  if (mk) mk.openPopup();
+}
+
+function fitAllLocations() {
+  if (!window._leafletMap) return;
+  const locs = Object.keys(TEAM).map(id => (appData[id]||{}).location).filter(Boolean);
+  if (!locs.length) return;
+  const bounds = L.latLngBounds(locs.map(l => [l.lat, l.lng]));
+  window._leafletMap.fitBounds(bounds, { padding: [40, 40] });
+}
+
 function renderMap() {
   renderVenuesAdmin();
   const locList = document.getElementById('location-list');
@@ -4852,8 +5106,8 @@ function renderMap() {
   const colors = ['#e05c5c','#5b8dee','#4caf7d','#c9a96e','#9c5de0','#f0a500','#00b4d8','#ff6b6b'];
   let ci = 0;
   let hasAny = false;
-
   let geocodeDelay = 0;
+
   Object.keys(TEAM).forEach(id => {
     const person = TEAM[id];
     const data = appData[id];
@@ -4863,18 +5117,26 @@ function renderMap() {
     const color = colors[ci++ % colors.length];
     const addrElId = `loc-addr-${id}`;
     const { lat, lng, time } = data.location;
+    const { icon: freshIcon, label: freshLabel, fresh } = _locFreshness(data.location);
+    const dirUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+
     const item = document.createElement('div');
     item.className = 'location-item';
+    item.style.cursor = 'pointer';
     item.innerHTML = `
       <div class="loc-dot" style="background:${color}"></div>
-      <div style="flex:1;min-width:0">
-        <div class="loc-name">${person.emoji} ${person.name}</div>
+      <div style="flex:1;min-width:0" onclick="panToLocation('${id}')">
+        <div class="loc-name">${person.emoji} ${person.name} <span style="font-size:0.75rem">${freshIcon}</span></div>
         <div class="loc-address" id="${addrElId}">📍 Loading…</div>
-        <div class="loc-time">🕐 ${time}</div>
+        <div class="loc-time">🕐 ${time} · ${freshLabel}</div>
+        <div style="display:flex;gap:0.4rem;margin-top:0.35rem;flex-wrap:wrap">
+          ${(isAdmin||isCoordinator) ? `<button onclick="event.stopPropagation();viewPersonTasksFromMap('${id}')" style="font-family:sans-serif;font-size:0.62rem;padding:0.18rem 0.5rem;border-radius:4px;border:1px solid var(--border);background:#eef4ff;color:var(--blue);cursor:pointer">📋 Tasks</button>` : ''}
+          <a href="${dirUrl}" target="_blank" onclick="event.stopPropagation()" style="font-family:sans-serif;font-size:0.62rem;padding:0.18rem 0.5rem;border-radius:4px;border:1px solid var(--border);background:#e6f7ef;color:#1a7a3c;text-decoration:none">🗺️ Directions</a>
+          ${!fresh ? `<span style="font-family:sans-serif;font-size:0.6rem;color:#e05c5c;padding:0.18rem 0.4rem;background:#fef0f0;border-radius:4px">Stale</span>` : ''}
+        </div>
       </div>
-      <button onclick="clearPersonLocation('${id}')" title="Remove location" style="background:none;border:1px solid #ecc;border-radius:6px;padding:0.2rem 0.5rem;font-size:0.7rem;cursor:pointer;color:#e05c5c;flex-shrink:0;align-self:flex-start">✕</button>`;
+      <button onclick="event.stopPropagation();clearPersonLocation('${id}')" title="Remove from map" style="background:none;border:1px solid #ecc;border-radius:6px;padding:0.2rem 0.5rem;font-size:0.7rem;cursor:pointer;color:#e05c5c;flex-shrink:0;align-self:flex-start">✕</button>`;
     locList.appendChild(item);
-    // Stagger geocode calls — Nominatim allows 1 req/sec
     setTimeout(() => reverseGeocode(lat, lng, addrElId), geocodeDelay);
     geocodeDelay += 1200;
   });
@@ -4886,6 +5148,18 @@ function renderMap() {
   } else {
     document.getElementById('map-last-updated').textContent = 'Updated just now';
     renderLeafletMap();
+  }
+}
+
+function viewPersonTasksFromMap(id) {
+  // Switch to overview and highlight this person, or open their tasks
+  if (isAdmin || isCoordinator) {
+    switchAdminTab('overview', document.querySelector('.admin-tab:nth-child(2)'));
+    setTimeout(() => {
+      const card = document.querySelector(`[onclick*="openPersonDetail('${id}')"]`) ||
+                   document.querySelector(`[data-person="${id}"]`);
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 200);
   }
 }
 
@@ -4921,20 +5195,48 @@ function initMap() {
   document.getElementById('live-map').style.display = 'block';
   if (window._leafletMap) { window._leafletMap.remove(); }
   window._leafletMarkers = {};
-  const locations = Object.keys(TEAM).map(id => ({ id, person: TEAM[id], loc: (appData[id] || {}).location })).filter(x => x.loc);
+  const locations = Object.keys(TEAM)
+    .filter(id => !(gpsSettings.excludedIds || []).includes(id))
+    .map(id => ({ id, person: TEAM[id], loc: (appData[id] || {}).location, trail: (appData[id] || {}).locationTrail }))
+    .filter(x => x.loc);
   if (!locations.length) return;
+
   const center = [locations[0].loc.lat, locations[0].loc.lng];
   const map = L.map('live-map').setView(center, 14);
   window._leafletMap = map;
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
-  locations.forEach(({ person, loc }) => {
-    const key = `${loc.lat.toFixed(4)},${loc.lng.toFixed(4)}`;
-    const cached = _geocodeCache[key] || '📍 Loading address…';
-    const marker = L.marker([loc.lat, loc.lng])
+
+  const trailColors = ['#e05c5c','#5b8dee','#4caf7d','#c9a96e','#9c5de0','#f0a500','#00b4d8','#ff6b6b'];
+  let ci = 0;
+
+  locations.forEach(({ id, person, loc, trail }) => {
+    const color = trailColors[ci++ % trailColors.length];
+    const { icon: freshIcon, label: freshLabel } = _locFreshness(loc);
+    const addrKey = `${loc.lat.toFixed(4)},${loc.lng.toFixed(4)}`;
+    const cached = _geocodeCache[addrKey] || '📍 Loading…';
+
+    // Draw trail polyline (dashed, semi-transparent)
+    if (trail && trail.length > 1) {
+      L.polyline(trail.map(p => [p.lat, p.lng]), {
+        color, weight: 2.5, opacity: 0.45, dashArray: '5, 6'
+      }).addTo(map);
+      // Circle at start of trail
+      L.circleMarker([trail[0].lat, trail[0].lng], {
+        radius: 4, fillColor: color, color, weight: 1, fillOpacity: 0.5
+      }).addTo(map);
+    }
+
+    // Pin marker at current position
+    const icon = L.divIcon({
+      html: `<div style="background:${color};color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:0.85rem;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3)">${person.emoji}</div>`,
+      className: '', iconSize: [28, 28], iconAnchor: [14, 14]
+    });
+    const marker = L.marker([loc.lat, loc.lng], { icon })
       .addTo(map)
-      .bindPopup(`<b>${person.emoji} ${person.name}</b><br>${person.role}<br>🕐 ${loc.time}<br>${cached}`);
-    window._leafletMarkers[key] = marker;
+      .bindPopup(`<b>${person.emoji} ${person.name}</b><br><span style="font-size:0.75rem;color:#888">${person.role}</span><br>🕐 ${loc.time} · ${freshIcon} ${freshLabel}<br>${cached}`);
+    window._leafletMarkers[id] = marker;
   });
+
   if (locations.length > 1) {
     const bounds = L.latLngBounds(locations.map(x => [x.loc.lat, x.loc.lng]));
     map.fitBounds(bounds, { padding: [30, 30] });
@@ -5351,6 +5653,12 @@ function signOut() {
   if (locationWatcher !== null) {
     navigator.geolocation.clearWatch(locationWatcher);
     locationWatcher = null;
+  }
+  // Clear this user's location so test sessions don't leave stale data
+  if (currentUser && appData[currentUser]) {
+    appData[currentUser].location = null;
+    appData[currentUser].locationTrail = [];
+    saveData();
   }
   clearInterval(roadCarIntervalId);
   roadCarIntervalId = null;
@@ -5779,6 +6087,7 @@ function editSubItem(parentIdx, subIdx) {
   document.getElementById('bm-gifted-by').value    = sub.gifted_by || '';
   document.getElementById('bm-gifted-amt').value   = sub.gifted_amount || '';
   document.getElementById('bm-note').value         = sub.note || '';
+  _setBmAdvanced(true);
   document.getElementById('budget-modal').classList.add('open');
 }
 
@@ -5805,6 +6114,18 @@ function closeBudgetModal() {
   if (catRow) catRow.style.display = '';
 }
 
+function _setBmAdvanced(open) {
+  const el  = document.getElementById('bm-advanced');
+  const arr = document.getElementById('bm-advanced-arrow');
+  if (!el) return;
+  if (open) { el.style.display = 'flex'; el.style.flexDirection = 'column'; el.style.gap = '0.75rem'; if (arr) arr.textContent = '▼'; }
+  else       { el.style.display = 'none'; if (arr) arr.textContent = '▶'; }
+}
+function toggleBmAdvanced() {
+  const el = document.getElementById('bm-advanced');
+  _setBmAdvanced(el && el.style.display === 'none');
+}
+
 function openAddBudgetItem() {
   editingBudgetIdx = -1;
   editingSubIdx    = -1;
@@ -5815,6 +6136,7 @@ function openAddBudgetItem() {
   document.getElementById('bm-subtasks-section').style.display = 'none';
   const catRow = document.getElementById('bm-category')?.closest('div[style]');
   if (catRow) catRow.style.display = '';
+  _setBmAdvanced(false);
   document.getElementById('budget-modal').classList.add('open');
   setTimeout(() => document.getElementById('bm-item').focus(), 100);
 }
@@ -5846,8 +6168,9 @@ function editBudgetItem(idx) {
   document.getElementById('bm-gifted-amt').value   = i.gifted_amount || '';
   document.getElementById('bm-note').value         = i.note || '';
 
-  // Show sub-items section
+  // Show sub-items section + expand advanced fields when editing
   renderModalSubtasks(idx);
+  _setBmAdvanced(true);
 
   document.getElementById('budget-modal').classList.add('open');
   setTimeout(() => document.getElementById('bm-item').focus(), 100);
@@ -5910,6 +6233,7 @@ async function saveAndAddSub() {
   document.getElementById('bm-subtasks-section').style.display = 'none';
   editingBudgetIdx = parentIdx; // keep parent ref
   editingSubIdx    = liveBudget[parentIdx].subtasks.length; // will be pushed at end
+  _setBmAdvanced(true);
   document.getElementById('bm-item').focus();
 }
 
