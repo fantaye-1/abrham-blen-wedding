@@ -1335,6 +1335,7 @@ header{background:linear-gradient(135deg,#1a1a1a 0%,#2d2416 100%);padding:1.2rem
           <div style="font-family:sans-serif;font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--gold)">💰 Budget</div>
           <div style="display:flex;align-items:center;gap:0.5rem">
             <button onclick="refreshBudgetNow()" title="Pull latest from cloud" id="budget-refresh-btn" style="background:none;border:1px solid var(--border);border-radius:6px;padding:0.18rem 0.45rem;font-size:0.75rem;cursor:pointer;color:var(--muted)">🔄</button>
+            <button onclick="loadBudgetDefaults()" title="Replace live budget with the latest code defaults" style="background:none;border:1px solid var(--border);border-radius:6px;padding:0.18rem 0.45rem;font-size:0.75rem;cursor:pointer;color:var(--muted)">↺ Load defaults</button>
             <button id="budget-toggle-btn" onclick="toggleBudgetPublic()" style="border:none;border-radius:20px;padding:0.28rem 0.7rem;font-family:sans-serif;font-size:0.7rem;cursor:pointer"></button>
           </div>
         </div>
@@ -2038,6 +2039,15 @@ async function refreshBudgetNow() {
   _updateBudgetToggleUI();
   if (btn) { btn.textContent = '🔄'; btn.disabled = false; }
   showToast('success', 'Budget refreshed', 'Showing latest data', 2000);
+}
+
+async function loadBudgetDefaults() {
+  if (!confirm('Replace the live budget with the 45-item list from the code? This cannot be undone.')) return;
+  liveBudget = BUDGET_ITEMS.map(i => ({...i}));
+  await saveBudget();
+  renderBudget();
+  _updateBudgetToggleUI();
+  showToast('success', 'Budget updated!', '45 items loaded from code defaults', 3000);
 }
 
 async function saveBudget() {
@@ -4749,10 +4759,10 @@ function renderBudgetReadonly() {
     el.innerHTML = '<div style="text-align:center;padding:3rem 1rem;color:var(--muted);font-family:sans-serif;font-size:0.85rem">No budget data yet.</div>';
     return;
   }
-  const totalBudget = data.reduce((s, i) => s + (parseFloat(i.budget) || 0), 0);
-  const totalSpent  = data.reduce((s, i) => s + (parseFloat(i.spent)  || 0), 0);
-  const remaining   = totalBudget - totalSpent;
-  const pct         = totalBudget ? Math.round((totalSpent / totalBudget) * 100) : 0;
+  const totalBudget = data.reduce((s, i) => s + (parseFloat(i.estimated) || 0), 0);
+  const totalPaid   = data.reduce((s, i) => s + (parseFloat(i.total_paid) || 0), 0);
+  const totalLeft   = data.reduce((s, i) => s + (parseFloat(i.remaining)  || 0), 0);
+  const pct         = totalBudget ? Math.round((totalPaid / totalBudget) * 100) : 0;
   const cats = [...new Set(data.map(i => i.category))];
   el.innerHTML = `
     <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;margin-bottom:1rem">
@@ -4761,27 +4771,27 @@ function renderBudgetReadonly() {
         <div style="height:100%;border-radius:4px;background:${pct>90?'#e05c5c':'var(--gold)'};width:${Math.min(pct,100)}%;transition:width 0.4s"></div>
       </div>
       <div style="display:flex;justify-content:space-between;font-family:sans-serif;font-size:0.78rem;margin-bottom:0.5rem">
-        <span style="color:var(--muted)">Spent</span><span style="font-weight:600;color:var(--dark)">$${totalSpent.toLocaleString()}</span>
+        <span style="color:var(--muted)">Total Paid</span><span style="font-weight:600;color:var(--dark)">$${totalPaid.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
       </div>
       <div style="display:flex;justify-content:space-between;font-family:sans-serif;font-size:0.78rem;margin-bottom:0.5rem">
-        <span style="color:var(--muted)">Total Budget</span><span style="color:var(--dark)">$${totalBudget.toLocaleString()}</span>
+        <span style="color:var(--muted)">Total Budget</span><span style="color:var(--dark)">$${totalBudget.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
       </div>
       <div style="display:flex;justify-content:space-between;font-family:sans-serif;font-size:0.78rem;border-top:1px solid var(--border);padding-top:0.5rem;margin-top:0.5rem">
-        <span style="color:var(--muted)">Remaining</span><span style="font-weight:600;color:${remaining<0?'#e05c5c':'#1a7a4a'}">$${remaining.toLocaleString()}</span>
+        <span style="color:var(--muted)">Still Owed</span><span style="font-weight:600;color:${totalLeft>0?'#c05c00':'#1a7a4a'}">$${totalLeft.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
       </div>
     </div>
     ${cats.map(cat => {
       const items = data.filter(i => i.category === cat);
-      const catSpent  = items.reduce((s,i) => s+(parseFloat(i.spent)||0),0);
-      const catBudget = items.reduce((s,i) => s+(parseFloat(i.budget)||0),0);
+      const catPaid   = items.reduce((s,i) => s+(parseFloat(i.total_paid)||0),0);
+      const catBudget = items.reduce((s,i) => s+(parseFloat(i.estimated)||0),0);
       return `<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;margin-bottom:0.65rem">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.55rem">
           <div style="font-family:sans-serif;font-size:0.78rem;font-weight:600;color:var(--dark)">${cat}</div>
-          <div style="font-family:sans-serif;font-size:0.72rem;color:var(--muted)">$${catSpent.toLocaleString()} / $${catBudget.toLocaleString()}</div>
+          <div style="font-family:sans-serif;font-size:0.72rem;color:var(--muted)">$${catPaid.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} paid / $${catBudget.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} est</div>
         </div>
         ${items.map(i => `<div style="display:flex;justify-content:space-between;font-family:sans-serif;font-size:0.76rem;padding:0.3rem 0;border-top:1px solid #f0f0f0">
           <span style="color:var(--dark)">${i.item}</span>
-          <span style="color:${parseFloat(i.spent)>parseFloat(i.budget)?'#e05c5c':'var(--muted)'}">${i.spent?'$'+parseFloat(i.spent).toLocaleString():'-'}</span>
+          <span style="color:${parseFloat(i.remaining)>0?'#c05c00':'var(--muted)'}">${i.total_paid?'$'+parseFloat(i.total_paid).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):'-'}</span>
         </div>`).join('')}
       </div>`;
     }).join('')}`;
@@ -5712,47 +5722,47 @@ const BUDGET_ITEMS = [
   {item:"Real Vision Studio (RVS)",category:"Photography",estimated:10000,actual:8500,deposit:2550,total_paid:2550,deposit_date:"October 8, 2025",remaining:5950,final_date:"July 31, 2026",reminder:"July 26, 2026",status:"Deposit Paid",vendor:"510-677-2548",gifted_by:"",gifted_amount:0,note:""},
   {item:"Eura Event Decore",category:"Decorations",estimated:8000,actual:6600,deposit:500,total_paid:500,deposit_date:"February 3, 2026",remaining:6100,final_date:"July 18, 2026",reminder:"May 1, 2026",status:"Deposit Paid",vendor:"678-907-2881",gifted_by:"",gifted_amount:0,note:""},
   {item:"Ymelse Libse",category:"Clothing",estimated:350,actual:248,deposit:0,total_paid:248,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Ring",category:"Ring",estimated:2000,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"RVS: Hotel + Transport",category:"Photography",estimated:1848.6,actual:1848.6,deposit:1848.6,total_paid:1848.6,deposit_date:"May 13, 2026",remaining:0,final_date:"May 13, 2026",reminder:"July 19, 2026",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Velo",category:"Clothing",estimated:600,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Suit 1",category:"Clothing",estimated:150,actual:147.81,deposit:0,total_paid:147.81,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Suit 2",category:"Clothing",estimated:450,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Ring",category:"Ring",estimated:2000,actual:166.87,deposit:0,total_paid:166.87,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"RVS: Hotel + Transport",category:"Photography",estimated:1848.6,actual:1848.6,deposit:1848.6,total_paid:848.60,deposit_date:"May 13, 2026",remaining:0,final_date:"May 13, 2026",reminder:"July 19, 2026",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Velo",category:"Clothing",estimated:600,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:550,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Suits",category:"Clothing",estimated:600,actual:538,deposit:0,total_paid:538,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Ye Church Habesa Libse",category:"Clothing",estimated:350,actual:210,deposit:0,total_paid:210,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Ye Adarsh Habesa Libse",category:"Clothing",estimated:500,actual:0,deposit:226.6,total_paid:583,deposit_date:"",remaining:273.4,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"Breket and Maramawit",gifted_amount:500,note:""},
-  {item:"Additional Libse",category:"Clothing",estimated:900,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Ye Adarsh Habesa Libse",category:"Clothing",estimated:500,actual:583,deposit:226.6,total_paid:83,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"Breket and Maramawit",gifted_amount:500,note:""},
+  {item:"Additional Libse(dress,shirt,)",category:"Clothing",estimated:900,actual:400,deposit:0,total_paid:200,deposit_date:"",remaining:200,final_date:"",reminder:"",status:"Deposit Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Habesha Libse",category:"Clothing",estimated:100,actual:87,deposit:0,total_paid:87,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Food Yeserge",category:"Food",estimated:10000,actual:8500,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Sega/Bera",category:"Food",estimated:0,actual:4650,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Drink (Beer, Liquor, Teji)",category:"Drink",estimated:2100,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Tej",category:"Drink",estimated:500,actual:500,deposit:0,total_paid:500,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Food Ye Church",category:"Food",estimated:2300,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Food Yeserge",category:"Food",estimated:10000,actual:8500,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Sega/Bera",category:"Food",estimated:0,actual:4650,deposit:0,total_paid:0,deposit_date:"",remaining:400,final_date:"",reminder:"",status:"Deposit Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Drink (Beer, Liquor, water parry)",category:"Drink",estimated:2100,actual:3762,deposit:0,total_paid:2725,deposit_date:"",remaining:1037,final_date:"",reminder:"",status:"Deposit Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Tej",category:"Drink",estimated:500,actual:500,deposit:0,total_paid:500,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Food Ye Church",category:"Food",estimated:2300,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:2300,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Mezemeran",category:"Transportation",estimated:560,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Car Lemo",category:"Transportation",estimated:1304,actual:1399.99,deposit:699.99,total_paid:699.99,deposit_date:"",remaining:700,final_date:"",reminder:"",status:"Deposit Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Zermari",category:"Entertainment",estimated:1000,actual:1000,deposit:402,total_paid:402,deposit_date:"March 25, 2026",remaining:600,final_date:"",reminder:"September 2, 2026",status:"Deposit Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Masinko",category:"Entertainment",estimated:1000,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Kerar",category:"Entertainment",estimated:600,actual:300,deposit:0,total_paid:300,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Set Meza Teklil Habesa Libse (88x4)",category:"Clothing",estimated:352,actual:356,deposit:178,total_paid:356,deposit_date:"",remaining:178,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Kerar",category:"Entertainment",estimated:600,actual:300,deposit:0,total_paid:0,deposit_date:"",remaining:300,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Set Meza Teklil Habesa Libse (88x4)",category:"Clothing",estimated:352,actual:356,deposit:178,total_paid:356,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Set Meza Dress (70x4)",category:"Clothing",estimated:280,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Set Meza Adarash Habesa Libse (100x4)",category:"Clothing",estimated:400,actual:489,deposit:245,total_paid:245,deposit_date:"",remaining:245,final_date:"",reminder:"",status:"Deposit Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Wend Meza Adarsh Habesa Libse (35x4)",category:"Clothing",estimated:140,actual:189,deposit:95,total_paid:95,deposit_date:"",remaining:95,final_date:"",reminder:"",status:"Deposit Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Wend Meza Church Habesa Libse (30x4)",category:"Clothing",estimated:120,actual:178,deposit:89,total_paid:89,deposit_date:"",remaining:89,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Set Meza Adarash Habesa Libse (100x4)",category:"Clothing",estimated:400,actual:489,deposit:245,total_paid:245,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Wend Meza Adarsh Habesa Libse (35x4)",category:"Clothing",estimated:140,actual:189,deposit:95,total_paid:95,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Wend Meza Church Habesa Libse (30x4)",category:"Clothing",estimated:120,actual:178,deposit:89,total_paid:89,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Wend Meza Suit (150x4)",category:"Clothing",estimated:600,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Accessories (shoes, getaget, goroget)",category:"Other",estimated:1000,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Accessories (getaget, goroget) and additional(manniqune and bridsmaid products)",category:"Other",estimated:500,actual:400,deposit:0,total_paid:400,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Fragrance",category:"Other",estimated:250,actual:0,deposit:0,total_paid:92,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Ye Enatoch Libse + Getaget",category:"Clothing",estimated:1200,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Ye Enatoch Libse + ye luggage",category:"Clothing",estimated:1200,actual:1196,deposit:0,total_paid:750,deposit_date:"",remaining:446,final_date:"",reminder:"",status:"Deposit Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Custom Products (knife, glass, pajama...)",category:"Other",estimated:500,actual:200,deposit:0,total_paid:200,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Ye Yeneta Libse",category:"Clothing",estimated:350,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Cake",category:"Food",estimated:700,actual:385,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Cake",category:"Food",estimated:700,actual:385,deposit:0,total_paid:0,deposit_date:"",remaining:192.50,final_date:"",reminder:"",status:"Deposit Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Thank You Cards",category:"Invitations",estimated:500,actual:35,deposit:17.3,total_paid:35,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Invitations",category:"Invitations",estimated:500,actual:91,deposit:45.13,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Kes Kebret Ticket",category:"Transportation",estimated:540,actual:390.8,deposit:0,total_paid:390.8,deposit_date:"March 25, 2026",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Gift Table",category:"Decorations",estimated:200,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Tewaf",category:"Other",estimated:10,actual:10,deposit:0,total_paid:10,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Other (misc)",category:"Other",estimated:190,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Hair, Nail, Makeup",category:"Other",estimated:1450,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Hotel Stay",category:"Other",estimated:0,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Other (music)",category:"Other",estimated:190,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"Hair, Nail, Makeup",category:"Other",estimated:1450,actual:850,deposit:0,total_paid:0,deposit_date:"",remaining:850,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
   {item:"Soft Drinks (106 + 36 pcs)",category:"Drink",estimated:200,actual:142,deposit:0,total_paid:142,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
-  {item:"Human Hair",category:"Other",estimated:450,actual:420,deposit:0,total_paid:420,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""}
+  {item:"Human Hair",category:"Other",estimated:450,actual:420,deposit:0,total_paid:420,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"shose and shirt",category:"Clothing",estimated:500,actual:0,deposit:0,total_paid:0,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Not Started",vendor:"",gifted_by:"",gifted_amount:0,note:""},
+  {item:"etsy suit",category:"Clothing",estimated:0,actual:0,deposit:0,total_paid:147.81,deposit_date:"",remaining:0,final_date:"",reminder:"",status:"Fully Paid",vendor:"",gifted_by:"",gifted_amount:0,note:""},
 ];
 
 const CAT_ICONS = {Venue:'🏛',Photography:'📸',Decorations:'🌸',Clothing:'👗',Ring:'💍',Food:'🍽',Drink:'🥂',Transportation:'🚗',Entertainment:'🎵',Other:'📦',Invitations:'✉'};
