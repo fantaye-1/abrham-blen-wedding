@@ -248,6 +248,8 @@ header{background:linear-gradient(135deg,#1a1a1a 0%,#2d2416 100%);padding:1.2rem
 .role-color-host{background:#e6faf5;color:#006a50;border-left-color:#1abc9c}
 .role-color-cloth{background:#ffe6f0;color:#7a003a;border-left-color:#e91e8c}
 .role-color-camera{background:#e8f0e8;color:#1a3a1a;border-left-color:#4a7a4a}
+.role-color-groomsman{background:#e8eef8;color:#1a2f60;border-left-color:#3a5fa0}
+.role-color-bridesmaid{background:#fce8f5;color:#660044;border-left-color:#c0297a}
 
 .signout-btn{display:flex;align-items:center;gap:0.4rem;font-family:sans-serif;font-size:0.72rem;color:var(--muted);background:none;border:none;cursor:pointer;margin-top:1.5rem;padding:0.5rem 0}
 .signout-btn:hover{color:var(--dark)}
@@ -981,6 +983,30 @@ header{background:linear-gradient(135deg,#1a1a1a 0%,#2d2416 100%);padding:1.2rem
         </div>
       </div>
 
+      <!-- GROOMSMEN -->
+      <div class="role-section">
+        <div class="role-label">🤵 Groomsmen</div>
+        <div class="role-people">
+          <div class="person-card xs" onclick="tapPerson('groomsman')">
+            <div class="person-avatar"><div class="person-avatar-placeholder">🤵</div></div>
+            <div class="person-name">Groomsmen</div>
+            <div class="progress-pill none" id="prog-groomsman">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BRIDESMAIDS -->
+      <div class="role-section">
+        <div class="role-label">👰 Bridesmaids</div>
+        <div class="role-people">
+          <div class="person-card xs" onclick="tapPerson('bridesmaid')">
+            <div class="person-avatar"><div class="person-avatar-placeholder">👰</div></div>
+            <div class="person-name">Bridesmaids</div>
+            <div class="progress-pill none" id="prog-bridesmaid">—</div>
+          </div>
+        </div>
+      </div>
+
       <!-- FOOD -->
       <div class="role-section">
         <div class="role-label">🍽️ Food</div>
@@ -1623,6 +1649,8 @@ const TEAM = {
   transport_2:  { name: 'Transport 2',      role: 'Transportation',   emoji: '🚗', pin: '0000', phone: '', group: 'transport' },
   host_1:       { name: 'Host 1',          role: 'Host',             emoji: '🎤', pin: '0000', phone: '', group: 'host' },
   host_2:       { name: 'Host 2',          role: 'Host',             emoji: '🎤', pin: '0000', phone: '', group: 'host' },
+  groomsman:    { name: 'Groomsmen',        role: 'Groomsmen',        emoji: '🤵', pin: '0000', phone: '', group: 'groomsman' },
+  bridesmaid:   { name: 'Bridesmaids',     role: 'Bridesmaids',      emoji: '👰', pin: '0000', phone: '', group: 'bridesmaid' },
   cloth_1:      { name: 'Cloth Team 1',    role: 'Clothing',         emoji: '👗', pin: '0000', phone: '', group: 'cloth' },
   cloth_2:      { name: 'Cloth Team 2',    role: 'Clothing',         emoji: '👘', pin: '0000', phone: '', group: 'cloth' },
 };
@@ -1694,6 +1722,21 @@ const DEFAULT_TASKS = {
     { text: 'Announce cake cutting', time: '8:25 PM', priority: 'medium', done: false },
     { text: 'Introduce speakers for family speeches', time: '9:05 PM', priority: 'medium', done: false },
     { text: 'Close program at 10:30 PM', time: '10:28 PM', priority: 'high', done: false },
+  ],
+  groomsman:   [
+    { text: 'Arrive at venue dressed & ready', time: '4:00 PM', priority: 'high', done: false },
+    { text: 'Escort guests to their seats', time: '4:45 PM', priority: 'high', done: false },
+    { text: 'Stand with groom during ceremony', time: '5:30 PM', priority: 'high', done: false },
+    { text: 'Group & family photos with couple', time: '6:30 PM', priority: 'medium', done: false },
+    { text: 'Support groom and enjoy the reception', time: 'Ongoing', priority: 'low', done: false },
+  ],
+  bridesmaid:  [
+    { text: 'Arrive at venue dressed & ready', time: '3:30 PM', priority: 'high', done: false },
+    { text: 'Assist bride with final preparations', time: '3:30 PM', priority: 'high', done: false },
+    { text: 'Walk in bridal procession', time: '5:25 PM', priority: 'high', done: false },
+    { text: 'Stand with bride during ceremony', time: '5:30 PM', priority: 'high', done: false },
+    { text: 'Group & family photos with couple', time: '6:30 PM', priority: 'medium', done: false },
+    { text: 'Support bride throughout the day', time: 'Ongoing', priority: 'low', done: false },
   ],
   cloth:       [
     { text: 'Prepare and steam wedding outfits', time: '10:00 AM', priority: 'high', done: false },
@@ -2523,7 +2566,7 @@ const ROLE_COLORS = {
   timekeeper:'role-color-timekeeper', coordinator:'role-color-coordinator',
   food:'role-color-food', drink:'role-color-drink',
   transport:'role-color-transport', host:'role-color-host', cloth:'role-color-cloth',
-  camera:'role-color-camera'
+  camera:'role-color-camera', groomsman:'role-color-groomsman', bridesmaid:'role-color-bridesmaid'
 };
 
 let currentTaskView = 'list';
@@ -4195,6 +4238,8 @@ function renderOverviewGrid() {
     { label: 'Drink Team',       icon: '🥂', ids: ['drink_1','drink_2'] },
     { label: 'Transport Team',   icon: '🚗', ids: ['transport_1','transport_2'] },
     { label: 'Host Team',        icon: '🎤', ids: ['host_1','host_2'] },
+    { label: 'Groomsmen',        icon: '🤵', ids: ['groomsman'] },
+    { label: 'Bridesmaids',      icon: '👰', ids: ['bridesmaid'] },
     { label: 'Cloth Team',       icon: '👗', ids: ['cloth_1','cloth_2'] },
   ];
 
@@ -5009,6 +5054,8 @@ function openContacts() {
     { label:'Drink',         icon:'🥂', ids:['drink_1','drink_2'] },
     { label:'Transport',     icon:'🚗', ids:['transport_1','transport_2'] },
     { label:'Host',          icon:'🎤', ids:['host_1','host_2'] },
+    { label:'Groomsmen',     icon:'🤵', ids:['groomsman'] },
+    { label:'Bridesmaids',   icon:'👰', ids:['bridesmaid'] },
     { label:'Cloth',         icon:'👗', ids:['cloth_1','cloth_2'] },
   ];
   let html = '';
@@ -5326,6 +5373,8 @@ function renderTeamMgmt() {
     { label: 'Drink Team',        icon: '🥂', ids: ['drink_1','drink_2'] },
     { label: 'Transport Team',    icon: '🚗', ids: ['transport_1','transport_2'] },
     { label: 'Host Team',         icon: '🎤', ids: ['host_1','host_2'] },
+    { label: 'Groomsmen',         icon: '🤵', ids: ['groomsman'] },
+    { label: 'Bridesmaids',       icon: '👰', ids: ['bridesmaid'] },
     { label: 'Cloth Team',        icon: '👗', ids: ['cloth_1','cloth_2'] },
   ];
 
@@ -5526,6 +5575,8 @@ const ROLE_GROUPS = {
   drink:       { label: 'Drink Team', ids: ['drink_1','drink_2'] },
   transport:   { label: 'Transport', ids: ['transport_1','transport_2'] },
   host:        { label: 'Host Team', ids: ['host_1','host_2'] },
+  groomsman:   { label: 'Groomsmen', ids: ['groomsman'] },
+  bridesmaid:  { label: 'Bridesmaids', ids: ['bridesmaid'] },
   cloth:       { label: 'Cloth Team', ids: ['cloth_1','cloth_2'] },
 };
 
@@ -5585,6 +5636,8 @@ function openAssignTask(preselectedId) {
     { label: '🥂 Drink Team',        ids: ['drink_1','drink_2'] },
     { label: '🚗 Transport',         ids: ['transport_1','transport_2'] },
     { label: '🎤 Host Team',         ids: ['host_1','host_2'] },
+    { label: '🤵 Groomsmen',         ids: ['groomsman'] },
+    { label: '👰 Bridesmaids',       ids: ['bridesmaid'] },
     { label: '👗 Cloth Team',        ids: ['cloth_1','cloth_2'] },
   ];
 
